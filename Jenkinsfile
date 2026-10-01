@@ -22,5 +22,12 @@ pipeline {
                 echo "Build completed: ${IMAGE_NAME}:${IMAGE_TAG}"
             }
         }
+
+        stage('Test') {
+            steps {
+                echo 'Running automated tests...'
+                sh 'npm test'
+            }
+        }
     }
 }
