@@ -16,6 +16,7 @@ pipeline {
                 sh 'npm run build'
 
                 echo 'Building Docker image...'
+
                 sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} .'
                 sh 'docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest'
 
@@ -26,23 +27,26 @@ pipeline {
         stage('Test') {
             steps {
                 echo 'Running automated tests...'
+
                 sh 'npm test'
             }
         }
 
-       stage('Code Quality') {
-    steps {
-        echo 'Running SonarQube code quality analysis...'
+        stage('Code Quality') {
+            steps {
+                echo 'Running SonarQube code quality analysis...'
 
-        withSonarQubeEnv('SonarQube') {
-            withSonarQubeScannerEnv('SonarScanner') {
-                sh '''
-                    sonar-scanner \
-                      -Dsonar.projectKey=8.2CDevSecOps \
-                      -Dsonar.projectName=8.2CDevSecOps \
-                      -Dsonar.sources=. \
-                      -Dsonar.exclusions=node_modules/**,public/js/bundle.js
-                '''
+                withSonarQubeEnv('SonarQube') {
+                    withSonarQubeScannerEnv('SonarScanner') {
+                        sh '''
+                            sonar-scanner \
+                              -Dsonar.projectKey=8.2CDevSecOps \
+                              -Dsonar.projectName=8.2CDevSecOps \
+                              -Dsonar.sources=. \
+                              -Dsonar.exclusions=node_modules/**,public/js/bundle.js
+                        '''
+                    }
+                }
             }
         }
     }
