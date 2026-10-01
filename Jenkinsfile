@@ -30,19 +30,19 @@ pipeline {
             }
         }
 
-        stage('Code Quality') {
-            steps {
-                echo 'Running SonarQube code quality analysis...'
+       stage('Code Quality') {
+    steps {
+        echo 'Running SonarQube code quality analysis...'
 
-                withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        sonar-scanner \
-                          -Dsonar.projectKey=8.2CDevSecOps \
-                          -Dsonar.projectName=8.2CDevSecOps \
-                          -Dsonar.sources=. \
-                          -Dsonar.exclusions=node_modules/**,public/js/bundle.js
-                    '''
-                }
+        withSonarQubeEnv('SonarQube') {
+            withSonarQubeScannerEnv('SonarScanner') {
+                sh '''
+                    sonar-scanner \
+                      -Dsonar.projectKey=8.2CDevSecOps \
+                      -Dsonar.projectName=8.2CDevSecOps \
+                      -Dsonar.sources=. \
+                      -Dsonar.exclusions=node_modules/**,public/js/bundle.js
+                '''
             }
         }
     }
