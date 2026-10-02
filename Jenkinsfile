@@ -54,20 +54,60 @@ pipeline {
             }
         }
 
-       stage('Security') {
-    steps {
-        echo 'Running dependency security scan...'
+        stage('Security') {
+            steps {
+                echo 'Running dependency security scan...'
 
-        sh '''
-            npm audit --json > npm-audit.json || true
-        '''
+                sh '''
+                    npm audit --json > npm-audit.json || true
+                '''
 
-        sh '''
-            npm audit --audit-level=critical || true
-        '''
+                sh '''
+                    npm audit --audit-level=critical || true
+                '''
 
-        archiveArtifacts artifacts: 'npm-audit.json', fingerprint: true
-    }
-}
+                archiveArtifacts artifacts: 'npm-audit.json', fingerprint: true
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo "Deploying ${IMAGE_NAME}:${IMAGE_TAG} to staging..."
+
+                sh '''
+                    docker rm -f goof-staging 2>/dev/null || true
+                    docker rm -f goof-mongo-staging 2>/dev/null || true
+                    docker rm -f goof-mysql-staging 2>/dev/null || true
+
+                    docker run -d \
+                      --name goof-mongo-staging \
+                      --platform linux/amd64 \
+                      -p 27017:27017 \
+                      mongo:3
+
+                    docker run -d \
+                      --name goof-mysql-staging \
+                      --platform linux/amd64 \
+                      -e MYSQL_ROOT_PASSWORD=root \
+                      -e MYSQL_DATABASE=acme \
+                      -p 3306:3306 \
+                      mysql:5
+
+                    sleep 30
+
+                    docker run -d \
+                      --name goof-staging \
+                      --link goof-mongo-staging:goof-mongo \
+                      --link goof-mysql-staging:good-mysql \
+                      -e DOCKER=1 \
+                      -p 3002:3001 \
+                      ${IMAGE_NAME}:${IMAGE_TAG}
+
+                    sleep 10
+
+                    curl --fail http://localhost:3002
+                '''
+            }
+        }
     }
 }

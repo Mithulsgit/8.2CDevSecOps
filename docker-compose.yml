@@ -1,4 +1,3 @@
-version: "2"
 services:
   goof:
     build: .
@@ -8,20 +7,28 @@ services:
     ports:
       - "3001:3001"
       - "9229:9229"
-    links:
-      - goof-mongo
     depends_on:
       - goof-mongo
+      - good-mysql
+
   goof-mongo:
     container_name: goof-mongo
     image: mongo:3
+    platform: linux/amd64
     ports:
       - "27017:27017"
+
   good-mysql:
     container_name: goof-mysql
     image: mysql:5
+    platform: linux/amd64
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: acme
     ports:
       - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
