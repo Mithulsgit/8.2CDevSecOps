@@ -121,5 +121,141 @@ pipeline {
                 '''
             }
         }
+
+        stage('Release') {
+            steps {
+                echo "Releasing ${IMAGE_NAME}:${IMAGE_TAG} to production..."
+
+                sh '''
+                    echo "Tagging release image..."
+                    docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:release-${IMAGE_TAG}
+
+                    echo "Preparing production network..."
+                    docker network rm goof-prod-network 2>/dev/null || true
+                    docker network create goof-prod-network
+
+                    echo "Starting production database services..."
+
+                    docker rm -f goof-mongo-prod 2>/dev/null || true
+                    docker rm -f goof-mysql-prod 2>/dev/null || true
+
+                    docker run -d \
+                      --name goof-mongo-prod \
+                      --network goof-prod-network \
+                      --network-alias goof-mongo \
+                      --platform linux/amd64 \
+                      mongo:3
+
+                    docker run -d \
+                      --name goof-mysql-prod \
+                      --network goof-prod-network \
+                      --network-alias good-mysql \
+                      --platform linux/amd64 \
+                      -e MYSQL_ROOT_PASSWORD=root \
+                      -e MYSQL_DATABASE=acme \
+                      mysql:5
+
+                    sleep 30
+
+                    echo "Starting production application..."
+
+                    docker rm -f goof-prod 2>/dev/null || true
+
+                    docker run -d \
+                      --name goof-prod \
+                      --network goof-prod-network \
+                      -e DOCKER=1 \
+                      -p 3003:3001 \
+                      ${IMAGE_NAME}:release-${IMAGE_TAG}
+
+                    sleep 15
+
+                    echo "Checking production container..."
+                    docker ps --filter name=goof-prod
+
+                    echo "Checking production logs..."
+                    docker logs --tail 30 goof-prod || true
+
+                    echo "Testing production release..."
+                    curl --fail http://host.docker.internal:3003
+
+                    echo "Production release ${IMAGE_NAME}:release-${IMAGE_TAG} is healthy."
+                '''
+            }
+        }
+
+        stage('Monitoring') {
+            steps {
+                echo 'Starting production monitoring and incident simulation...'
+
+                sh '''
+                    echo "========================================"
+                    echo "Production Health Check"
+                    echo "========================================"
+
+                    curl --fail http://host.docker.internal:3003
+
+                    echo ""
+                    echo "Container status:"
+                    docker inspect --format='Status: {{.State.Status}}' goof-prod
+
+                    echo ""
+                    echo "Container resource usage:"
+                    docker stats --no-stream \
+                      --format "CPU: {{.CPUPerc}} | Memory: {{.MemUsage}} | Network: {{.NetIO}}" \
+                      goof-prod
+
+                    echo ""
+                    echo "========================================"
+                    echo "Simulating Production Incident"
+                    echo "========================================"
+
+                    docker stop goof-prod
+
+                    echo "Checking whether monitoring detects the failure..."
+
+                    if curl --silent --fail http://host.docker.internal:3003 > /dev/null; then
+                        echo "ALERT: Production application is still responding."
+                        exit 1
+                    else
+                        echo "ALERT DETECTED: Production application is unavailable."
+                    fi
+
+                    echo ""
+                    echo "========================================"
+                    echo "Recovering Production Service"
+                    echo "========================================"
+
+                    docker start goof-prod
+
+                    sleep 10
+
+                    curl --fail http://host.docker.internal:3003
+
+                    echo ""
+                    echo "Production service recovered successfully."
+                    echo "Monitoring and incident recovery completed."
+                '''
+            }
+        }
+    }
+
+    post {
+        success {
+            echo '========================================'
+            echo '7-STAGE DEVSECOPS PIPELINE SUCCESSFUL'
+            echo '========================================'
+            echo "Build: ${BUILD_NUMBER}"
+            echo "Image: ${IMAGE_NAME}:${IMAGE_TAG}"
+            echo "Release: ${IMAGE_NAME}:release-${IMAGE_TAG}"
+        }
+
+        failure {
+            echo '========================================'
+            echo 'PIPELINE FAILED'
+            echo '========================================'
+            echo "Build: ${BUILD_NUMBER}"
+            echo 'Check the failed stage and Jenkins console output.'
+        }
     }
 }
