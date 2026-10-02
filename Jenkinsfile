@@ -110,7 +110,14 @@ pipeline {
 
                     sleep 15
 
-                    curl --fail http://localhost:3002
+                    echo "Checking staging container..."
+                    docker ps --filter name=goof-staging
+
+                    echo "Checking application logs..."
+                    docker logs --tail 30 goof-staging || true
+
+                    echo "Testing staging application..."
+                    curl --fail http://host.docker.internal:3002
                 '''
             }
         }
