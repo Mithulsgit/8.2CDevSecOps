@@ -32,26 +32,42 @@ pipeline {
             }
         }
 
-   stage('Code Quality') {
-    steps {
-        echo 'Running SonarQube code quality analysis...'
+        stage('Code Quality') {
+            steps {
+                echo 'Running SonarQube code quality analysis...'
 
-        script {
-            def scannerHome = tool 'SonarScanner'
+                script {
+                    def scannerHome = tool 'SonarScanner'
 
-            withSonarQubeEnv('SonarQube') {
-                sh "${scannerHome}/bin/sonar-scanner " +
-                   "-Dsonar.projectKey=8.2CDevSecOps " +
-                   "-Dsonar.projectName=8.2CDevSecOps " +
-                   "-Dsonar.sources=. " +
-                   "-Dsonar.exclusions=node_modules/**,public/js/bundle.js"
-            }
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${scannerHome}/bin/sonar-scanner " +
+                           "-Dsonar.projectKey=8.2CDevSecOps " +
+                           "-Dsonar.projectName=8.2CDevSecOps " +
+                           "-Dsonar.sources=. " +
+                           "-Dsonar.exclusions=node_modules/**,public/js/bundle.js"
+                    }
 
-            timeout(time: 5, unit: 'MINUTES') {
-                waitForQualityGate abortPipeline: true
+                    timeout(time: 5, unit: 'MINUTES') {
+                        waitForQualityGate abortPipeline: true
+                    }
+                }
             }
         }
-    }
-}
+
+        stage('Security') {
+            steps {
+                echo 'Running dependency security scan...'
+
+                sh '''
+                    npm audit --json > npm-audit.json || true
+                '''
+
+                sh '''
+                    npm audit --audit-level=critical
+                '''
+
+                archiveArtifacts artifacts: 'npm-audit.json', fingerprint: true
+            }
+        }
     }
 }
