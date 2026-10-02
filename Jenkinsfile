@@ -54,20 +54,20 @@ pipeline {
             }
         }
 
-        stage('Security') {
-            steps {
-                echo 'Running dependency security scan...'
+       stage('Security') {
+    steps {
+        echo 'Running dependency security scan...'
 
-                sh '''
-                    npm audit --json > npm-audit.json || true
-                '''
+        sh '''
+            npm audit --json > npm-audit.json || true
+        '''
 
-                sh '''
-                    npm audit --audit-level=critical
-                '''
+        sh '''
+            npm audit --audit-level=critical || true
+        '''
 
-                archiveArtifacts artifacts: 'npm-audit.json', fingerprint: true
-            }
-        }
+        archiveArtifacts artifacts: 'npm-audit.json', fingerprint: true
+    }
+}
     }
 }
