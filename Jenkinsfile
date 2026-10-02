@@ -79,31 +79,36 @@ pipeline {
                     docker rm -f goof-mongo-staging 2>/dev/null || true
                     docker rm -f goof-mysql-staging 2>/dev/null || true
 
+                    docker network rm goof-staging-network 2>/dev/null || true
+
+                    docker network create goof-staging-network
+
                     docker run -d \
                       --name goof-mongo-staging \
+                      --network goof-staging-network \
+                      --network-alias goof-mongo \
                       --platform linux/amd64 \
-                      -p 27017:27017 \
                       mongo:3
 
                     docker run -d \
                       --name goof-mysql-staging \
+                      --network goof-staging-network \
+                      --network-alias good-mysql \
                       --platform linux/amd64 \
                       -e MYSQL_ROOT_PASSWORD=root \
                       -e MYSQL_DATABASE=acme \
-                      -p 3306:3306 \
                       mysql:5
 
                     sleep 30
 
                     docker run -d \
                       --name goof-staging \
-                      --link goof-mongo-staging:goof-mongo \
-                      --link goof-mysql-staging:good-mysql \
+                      --network goof-staging-network \
                       -e DOCKER=1 \
                       -p 3002:3001 \
                       ${IMAGE_NAME}:${IMAGE_TAG}
 
-                    sleep 10
+                    sleep 15
 
                     curl --fail http://localhost:3002
                 '''
